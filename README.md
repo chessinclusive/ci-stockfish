@@ -6,7 +6,8 @@ Chess.Inclusive Stockfish implementation
 A simple FastAPI application served by Uvicorn.
 
 ```bash
-python -m uvicorn app.app:app --reload
+cd app/
+python -m uvicorn app:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Docker & AWS ECR

@@ -6,7 +6,7 @@ STOCKFISH_ENGINE = None
 if platform.system() == "Windows":
     STOCKFISH_ENGINE = chess.engine.SimpleEngine.popen_uci("stockfish\\stockfish-windows-x86-64.exe")
 elif platform.system() == "Linux":  
-    STOCKFISH_ENGINE = chess.engine.SimpleEngine.popen_uci("stockfish-src/stockfish-android-armv8-dotprod")
+    STOCKFISH_ENGINE = chess.engine.SimpleEngine.popen_uci("stockfish-src/stockfish-ubuntu-x86-64")
     print("------- stockfish loaded for linux -------")
 elif platform.system() == "Darwin":
     STOCKFISH_ENGINE = chess.engine.SimpleEngine.popen_uci("/opt/homebrew/bin/stockfish")
