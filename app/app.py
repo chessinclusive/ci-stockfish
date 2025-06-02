@@ -2,11 +2,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
-import chess
-import chess.engine
-from chess.engine import Cp
-
-from STOCKFISH import STOCKFISH_ENGINE, STOCKFISH_PARAMS, STOCKFISH_MOVES, STOCKFISH_VERSION
+from stockfish import Stockfish
+stockfish = Stockfish(path="stockfish-src/stockfish-ubuntu-x86-64")
 
 app = FastAPI()
 handler = Mangum(app)
@@ -30,22 +27,25 @@ async def log_requests(request: Request, call_next):
 @app.get("/stockfish_evaluation")
 def stockfish_evaluation(fen_position: str):
     print(f"Received FEN position: {fen_position}")
-    board = chess.Board(fen_position)
+    stockfish.set_fen_position(fen_position)
+
     try:
-        if STOCKFISH_ENGINE:
-            result = STOCKFISH_ENGINE.analyse(board, STOCKFISH_PARAMS, multipv=STOCKFISH_MOVES)
-                    
-            engine_analysis = []
-            for idx, res in enumerate(result):
-                engine_analysis.append({
-                    f"top_move_{idx}": res.get('pv', [''])[0],
-                    f"stockfish {STOCKFISH_VERSION} evaluation": res.get('score', chess.engine.PovScore(relative=Cp(0), turn=chess.WHITE)).relative.score()
-                })
-        else:
-            engine_analysis = [{'top_move_0': '', 'stockfish 17 evaluation': chess.engine.PovScore(relative=Cp(0), turn=chess.WHITE).relative.score()}]
+        engine_analysis = {
+            "best_move": stockfish.get_best_move(), 
+            "top_moves": stockfish.get_top_moves(3),
+            "wdl": stockfish.get_wdl_stats(),
+            "current_score": stockfish.get_evaluation(),
+            "stockfish_version": stockfish.get_stockfish_major_version()
+        }
     except Exception as e:
         print(f"Error while getting engine analysis: {e}")
-        engine_analysis = [{'top_move_0': '', 'stockfish 17 evaluation': chess.engine.PovScore(relative=Cp(0), turn=chess.WHITE).relative.score()}]
+        engine_analysis = {
+            "best_move": '', 
+            "top_moves": [],
+            "wdl": [],
+            "current_score": 0,
+            "stockfish_version": 17
+        }
 
     return engine_analysis
 
@@ -53,9 +53,9 @@ def stockfish_evaluation(fen_position: str):
 async def root():
     return {"message": "Hello, World!"}
 
-# if __name__ == "__main__":
-#     response = stockfish_evaluation("4k2r/6r1/8/8/8/8/3R4/R3K3 w Qk - 0 1")
-#     print(response)
-
 if __name__ == "__main__":
-   uvicorn.run(app, host="0.0.0.0", port=8080)
+   response = stockfish_evaluation("4k2r/6r1/8/8/8/8/3R4/R3K3 w Qk - 0 1")
+   print(response)
+
+# if __name__ == "__main__":
+#    uvicorn.run(app, host="0.0.0.0", port=8080)
