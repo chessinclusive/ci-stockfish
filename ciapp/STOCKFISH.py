@@ -35,8 +35,18 @@ try:
     STOCKFISH_ENGINE = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
     print(f"Loaded Stockfish from {STOCKFISH_PATH}")
 except Exception as exc:
-    print(f"Failed to load Stockfish from {STOCKFISH_PATH}: {exc}")
-    STOCKFISH_ENGINE = None
+    try:
+        STOCKFISH_PATH = "ciapp/stockfish-src/stockfish-ubuntu-x86-64"
+        STOCKFISH_ENGINE = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+        print(f"Loaded Stockfish from {STOCKFISH_PATH}")
+    except Exception as exc:
+        try:     
+            STOCKFISH_PATH = "ciapp/stockfish-src/stockfish-ubuntu-x86-64-avx2"
+            STOCKFISH_ENGINE = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+            print(f"Loaded Stockfish from {STOCKFISH_PATH}")
+        except Exception as exc3:
+            print(f"Failed to load Stockfish engine from {STOCKFISH_PATH}: {exc}")
+            STOCKFISH_ENGINE = None
 
 # Depth / time / multipv can be tuned via env
 STOCKFISH_DEPTH = int(os.getenv("STOCKFISH_DEPTH", "15"))
