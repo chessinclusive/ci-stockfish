@@ -1,52 +1,69 @@
 import os
+import platform
+from typing import Iterable, List, Optional, Tuple
+
 import chess
 import chess.engine
-import platform
-from typing import Optional
 
-def resolve_stockfish_path() -> Optional[str]:
-    """Return a usable Stockfish binary path for the current platform."""
-    # Env override wins
+
+def resolve_stockfish_candidates() -> List[str]:
+    """Return an ordered list of candidate Stockfish binary paths."""
+    paths: List[str] = []
+
     env_path = os.getenv("STOCKFISH_PATH")
     if env_path:
-        return env_path
+        paths.append(env_path)
 
     system = platform.system()
     if system == "Windows":
-        return "stockfish\\stockfish-windows-x86-64.exe"
-    if system == "Darwin":
-        return "/opt/homebrew/bin/stockfish"
-    if system == "Linux":
+        paths.append("stockfish\\stockfish-windows-x86-64.exe")
+    elif system == "Darwin":
+        paths.append("/opt/homebrew/bin/stockfish")
+    elif system == "Linux":
         # Debian/Ubuntu package installs here; fallback to PATH lookup
-        print("Checking for Stockfish binary on Linux...")
         if os.path.exists("ciapp/stockfish-src/stockfish-android-armv8-dotprod"):
-            return "ciapp/stockfish-src/stockfish-android-armv8-dotprod"
+            paths.append("ciapp/stockfish-src/stockfish-android-armv8-dotprod")
         elif os.path.exists("/usr/games/stockfish"):
-            return "/usr/games/stockfish"
-        return "stockfish"
-    return None
+            paths.append("/usr/games/stockfish")
+        paths.append("stockfish")
+
+    # Local fallbacks
+    paths.extend([
+        "ciapp/stockfish-src/stockfish-ubuntu-x86-64",
+        "ciapp/stockfish-src/stockfish-ubuntu-x86-64-avx2",
+    ])
+
+    # Keep order but drop duplicates
+    seen = set()
+    deduped = []
+    for p in paths:
+        if p and p not in seen:
+            deduped.append(p)
+            seen.add(p)
+    return deduped
 
 
-STOCKFISH_PATH = resolve_stockfish_path()
-if not STOCKFISH_PATH:
-    raise NotImplementedError("Operating system not supported or STOCKFISH_PATH unset")
+def spawn_engine(preferred_path: Optional[str] = None) -> Tuple[chess.engine.SimpleEngine, str]:
+    """Start a Stockfish engine, trying preferred_path first then fallbacks."""
+    candidates: Iterable[str] = []
+    if preferred_path:
+        candidates = [preferred_path] + [p for p in resolve_stockfish_candidates() if p != preferred_path]
+    else:
+        candidates = resolve_stockfish_candidates()
 
-try:
-    STOCKFISH_ENGINE = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
-    print(f"Loaded Stockfish from {STOCKFISH_PATH}")
-except Exception as exc:
-    try:
-        STOCKFISH_PATH = "ciapp/stockfish-src/stockfish-ubuntu-x86-64"
-        STOCKFISH_ENGINE = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
-        print(f"Loaded Stockfish from {STOCKFISH_PATH}")
-    except Exception as exc:
-        try:     
-            STOCKFISH_PATH = "ciapp/stockfish-src/stockfish-ubuntu-x86-64-avx2"
-            STOCKFISH_ENGINE = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
-            print(f"Loaded Stockfish from {STOCKFISH_PATH}")
-        except Exception as exc3:
-            print(f"Failed to load Stockfish engine from {STOCKFISH_PATH}: {exc}")
-            STOCKFISH_ENGINE = None
+    last_exc: Optional[Exception] = None
+    for path in candidates:
+        try:
+            eng = chess.engine.SimpleEngine.popen_uci(path)
+            print(f"Loaded Stockfish from {path}")
+            return eng, path
+        except Exception as exc:
+            last_exc = exc
+            print(f"Failed to load Stockfish from {path}: {exc}")
+            continue
+
+    raise RuntimeError(f"Unable to start Stockfish engine. Last error: {last_exc}")
+
 
 # Depth / time / multipv can be tuned via env
 STOCKFISH_DEPTH = int(os.getenv("STOCKFISH_DEPTH", "15"))
